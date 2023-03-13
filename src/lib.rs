@@ -9,8 +9,8 @@ pub mod phf {
         include!(concat!(env!("OUT_DIR"), "/keywords.rs"));
 
     #[inline(always)]
-    pub fn is_keyword(s: &str) -> bool {
-        KEYWORDS.contains_key(s)
+    pub fn get_token(s: &str) -> Option<&Tok> {
+        KEYWORDS.get(s)
     }
 }
 
@@ -65,7 +65,57 @@ pub mod stdlib_hashmap {
     });
 
     #[inline(always)]
-    pub fn is_keyword(s: &str) -> bool {
-        KEYWORDS.contains_key(s)
+    pub fn get_token(s: &str) -> Option<&Tok> {
+        KEYWORDS.get(s)
+    }
+}
+
+// Using a match to get the token.
+pub mod match_keyword {
+    use crate::token::*;
+
+    #[inline(always)]
+    pub fn get_token(s: &str) -> Option<&Tok> {
+        match s {
+            "..." => Some(&Tok::Ellipsis),
+            "False" => Some(&Tok::False),
+            "None" => Some(&Tok::None),
+            "True" => Some(&Tok::True),
+            "and" => Some(&Tok::And),
+            "as" => Some(&Tok::As),
+            "assert" => Some(&Tok::Assert),
+            "async" => Some(&Tok::Async),
+            "await" => Some(&Tok::Await),
+            "break" => Some(&Tok::Break),
+            "case" => Some(&Tok::Case),
+            "class" => Some(&Tok::Class),
+            "continue" => Some(&Tok::Continue),
+            "def" => Some(&Tok::Def),
+            "del" => Some(&Tok::Del),
+            "elif" => Some(&Tok::Elif),
+            "else" => Some(&Tok::Else),
+            "except" => Some(&Tok::Except),
+            "finally" => Some(&Tok::Finally),
+            "for" => Some(&Tok::For),
+            "from" => Some(&Tok::From),
+            "global" => Some(&Tok::Global),
+            "if" => Some(&Tok::If),
+            "import" => Some(&Tok::Import),
+            "in" => Some(&Tok::In),
+            "is" => Some(&Tok::Is),
+            "lambda" => Some(&Tok::Lambda),
+            "match" => Some(&Tok::Match),
+            "nonlocal" => Some(&Tok::Nonlocal),
+            "not" => Some(&Tok::Not),
+            "or" => Some(&Tok::Or),
+            "pass" => Some(&Tok::Pass),
+            "raise" => Some(&Tok::Raise),
+            "return" => Some(&Tok::Return),
+            "try" => Some(&Tok::Try),
+            "while" => Some(&Tok::While),
+            "with" => Some(&Tok::With),
+            "yield" => Some(&Tok::Yield),
+            _ => None,
+        }
     }
 }

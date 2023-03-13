@@ -1,46 +1,36 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use kwhash::{phf, stdlib_hashmap};
-use unic_ucd_ident::is_xid_start;
+use criterion::{criterion_group, criterion_main, Criterion, black_box};
+use kwhash::{phf, stdlib_hashmap, match_keyword};
 
-// Tokenize the pydump.txt file containing the full stdlib and the test lib.
-// We only do a rudimentary tokenization by splitting on whitespace and filtering
-// out non-identifiers. The effect of this is basically as if we had more non-keywords
-// than what we usually would.
+// Simply split by whitespace. 
+//
+// stdlib_testlib.txt is a dump of Python's stdlib and testlib names; it represents
+// a good distribution of keywords and non-keywords.
 fn rudimentary_tokens() -> Vec<&'static str> {
-    let pydump = include_str!("pydump.txt");
-    pydump
+    let names = include_str!("stdlib_testlib.txt");
+    names
         .split_whitespace()
-        .filter(|s| {
-            let c = s.chars().next().unwrap();
-            match c {
-                'a'..='z' | 'A'..='Z' | '_' => true,
-                _ => is_xid_start(c),
-            }
-        })
         .collect()
+}
+
+macro_rules! bench_alt {
+    ($c:ident, $module:ident, $name:literal, $tokens:expr) => {
+        $c.bench_function($name, |b| {
+            b.iter(|| {
+                for t in $tokens {
+                    black_box($module::get_token(t));
+                }
+            })
+        });
+    };
 }
 
 // Bench alternatives:
 fn bench_alts(c: &mut Criterion) {
     let tokens: Vec<_> = rudimentary_tokens();
 
-    c.bench_function(&format!("phf: ({0} keywords)", tokens.len()), |b| {
-        let tokens = tokens.clone();
-        b.iter(|| {
-            for t in &tokens {
-                phf::is_keyword(t);
-            }
-        })
-    });
-
-    c.bench_function(&format!("stdlib hashmap: ({0} keywords)", tokens.len()), |b| {
-        let tokens = tokens.clone();
-        b.iter(|| {
-            for t in &tokens {
-                stdlib_hashmap::is_keyword(t);
-            }
-        })
-    });
+    bench_alt!(c, phf, "Rust-phf", &tokens);
+    bench_alt!(c, stdlib_hashmap, "Standard library hashmap", &tokens);
+    bench_alt!(c, match_keyword, "Match on keywords", &tokens);
 }
 
 criterion_group!(benches, bench_alts);
