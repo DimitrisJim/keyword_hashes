@@ -2,14 +2,23 @@
 mod token;
 use crate::token::*;
 
-static KEYWORDS: phf::Map<&'static str, Tok> = include!(concat!(env!("OUT_DIR"), "/keywords.rs"));
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+
+static KEYWORDS_PHF: phf::Map<&'static str, Tok> = include!(concat!(env!("OUT_DIR"), "/keywords_phf.rs"));
 
 #[inline(always)]
 pub fn get_token_phf(s: &str) -> Option<&Tok> {
-    KEYWORDS.get(s)
+    KEYWORDS_PHF.get(s)
 }
-use once_cell::sync::Lazy;
-use std::collections::HashMap;
+
+
+// TODO: Fix up, add to benches.
+// static KEYWORDS_TINYPHF: tinyphf::Map<&'static str, Tok> = include!(concat!(env!("OUT_DIR"), "/keywords_tiny_phf.rs"));
+// #[inline(always)]
+// pub fn get_token_tinyphf(s: &str) -> Option<&Tok> {
+//     KEYWORDS_TINYPHF.get(s)
+// }
 
 static KEYWORDS_2: Lazy<HashMap<&'static str, Tok>> = Lazy::new(|| {
     let mut m = HashMap::new();
@@ -108,12 +117,7 @@ pub fn get_token_match(s: &str) -> Option<&Tok> {
 // regress for some reason.
 #[inline(always)]
 pub fn get_token_match_len(s: &str) -> Option<&Tok> {
-    let len = s.len() - 2;
-    if len > 6 {
-        return None;
-    }
-
-    match len {
+    match s.len() - 2 {
         0 => match s {
             "as" => Some(&Tok::As),
             "in" => Some(&Tok::In),
@@ -161,6 +165,81 @@ pub fn get_token_match_len(s: &str) -> Option<&Tok> {
             "lambda" => Some(&Tok::Lambda),
             "return" => Some(&Tok::Return),
             "except" => Some(&Tok::Except),
+            _ => None,
+        },
+        5 => match s {
+            "finally" => Some(&Tok::Finally),
+            _ => None,
+        },
+        6 => match s {
+            "continue" => Some(&Tok::Continue),
+            "nonlocal" => Some(&Tok::Nonlocal),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+// Pre-match on the length of the string before doing the match and using the most
+// frequent (based on stdlib/test code) keywords first. The idea is that after the
+// jump the compiler does to a sub-region of the match space based on length, we'll
+// give it the most likely keywords to match first.
+//
+// Update: According to the benchmarks, there isn't a statistically significant
+// improvement. 
+// Lesson: the compiler is obviously smarter on this than I am.
+#[inline(always)]
+pub fn get_token_match_len_dist(s: &str) -> Option<&Tok> {
+    match s.len() - 2 {
+        0 => match s {
+            "if" => Some(&Tok::If),
+            "in" => Some(&Tok::In),
+            "is" => Some(&Tok::Is),
+            "as" => Some(&Tok::As),
+            "or" => Some(&Tok::Or),
+            _ => None,
+        },
+        1 => match s {
+            "def" => Some(&Tok::Def),
+            "for" => Some(&Tok::For),
+            "not" => Some(&Tok::Not),
+            "try" => Some(&Tok::Try),
+            "and" => Some(&Tok::And),
+            "del" => Some(&Tok::Del),
+            "..." => Some(&Tok::Ellipsis),
+            _ => None,
+        },
+        2 => match s {
+            "None" => Some(&Tok::None),
+            "with" => Some(&Tok::With),
+            "else" => Some(&Tok::Else),
+            "True" => Some(&Tok::True),
+            "from" => Some(&Tok::From),
+            "pass" => Some(&Tok::Pass),
+            // Not represented in sample.
+            "case" => Some(&Tok::Case),
+            _ => None,
+        },
+        3 => match s {
+            "class" => Some(&Tok::Class),
+            "raise" => Some(&Tok::Raise),
+            "False" => Some(&Tok::False),
+            "yield" => Some(&Tok::Yield),
+            "while" => Some(&Tok::While),
+            "break" => Some(&Tok::Break),
+            "async" => Some(&Tok::Async),
+            "await" => Some(&Tok::Await),
+            // Not represented in sample.
+            "match" => Some(&Tok::Match),
+            _ => None,
+        },
+        4 => match s {
+            "return" => Some(&Tok::Return),
+            "import" => Some(&Tok::Import),
+            "except" => Some(&Tok::Except),
+            "lambda" => Some(&Tok::Lambda),
+            "assert" => Some(&Tok::Assert),
+            "global" => Some(&Tok::Global),
             _ => None,
         },
         5 => match s {
