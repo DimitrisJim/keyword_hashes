@@ -4,15 +4,6 @@ use kwhash::{
     get_token_phf, get_token_stdlib_hash,
 };
 
-// Simply split by whitespace.
-//
-// stdlib_testlib.txt is a dump of Python's stdlib and testlib names; it represents
-// a good distribution of keywords and non-keywords.
-fn rudimentary_tokens() -> Vec<&'static str> {
-    let names = include_str!("stdlib_testlib.txt");
-    names.split_whitespace().collect()
-}
-
 macro_rules! bench_alt {
     ($c:ident, $func:ident, $name:literal, $tokens:expr) => {
         $c.bench_function($name, |b| {
@@ -27,7 +18,9 @@ macro_rules! bench_alt {
 
 // Bench alternatives:
 fn bench_alts(c: &mut Criterion) {
-    let tokens: Vec<_> = rudimentary_tokens();
+    let tokens: Vec<_> = include_str!("../stdlib_testlib.txt")
+        .split_whitespace()
+        .collect();
 
     bench_alt!(c, get_token_phf, "Rust-phf", &tokens);
     bench_alt!(

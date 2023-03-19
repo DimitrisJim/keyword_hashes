@@ -8,3 +8,6 @@ edition = "2021"
 name = "tinyphf"
 path = "src/lib.rs"
 test = false
+
+[dependencies]
+rand = "0.8.4"

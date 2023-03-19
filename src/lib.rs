@@ -1,17 +1,17 @@
 //! Export functions for benching.
-mod token;
-use crate::token::*;
-
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-static KEYWORDS_PHF: phf::Map<&'static str, Tok> = include!(concat!(env!("OUT_DIR"), "/keywords_phf.rs"));
+mod token;
+use crate::token::*;
+
+static KEYWORDS_PHF: phf::Map<&'static str, Tok> =
+    include!(concat!(env!("OUT_DIR"), "/keywords_phf.rs"));
 
 #[inline(always)]
 pub fn get_token_phf(s: &str) -> Option<&Tok> {
     KEYWORDS_PHF.get(s)
 }
-
 
 // TODO: Fix up, add to benches.
 // static KEYWORDS_TINYPHF: tinyphf::Map<&'static str, Tok> = include!(concat!(env!("OUT_DIR"), "/keywords_tiny_phf.rs"));
@@ -117,7 +117,11 @@ pub fn get_token_match(s: &str) -> Option<&Tok> {
 // regress for some reason.
 #[inline(always)]
 pub fn get_token_match_len(s: &str) -> Option<&Tok> {
-    match s.len() - 2 {
+    let length = s.len();
+    if length < 2 || length > 8 {
+        return None;
+    }
+    match length - 2 {
         0 => match s {
             "as" => Some(&Tok::As),
             "in" => Some(&Tok::In),
@@ -138,6 +142,7 @@ pub fn get_token_match_len(s: &str) -> Option<&Tok> {
         },
         2 => match s {
             "case" => Some(&Tok::Case),
+            "elif" => Some(&Tok::Elif),
             "else" => Some(&Tok::Else),
             "from" => Some(&Tok::From),
             "pass" => Some(&Tok::Pass),
@@ -186,11 +191,15 @@ pub fn get_token_match_len(s: &str) -> Option<&Tok> {
 // give it the most likely keywords to match first.
 //
 // Update: According to the benchmarks, there isn't a statistically significant
-// improvement. 
+// improvement.
 // Lesson: the compiler is obviously smarter on this than I am.
 #[inline(always)]
 pub fn get_token_match_len_dist(s: &str) -> Option<&Tok> {
-    match s.len() - 2 {
+    let length = s.len();
+    if length < 2 || length > 8 {
+        return None;
+    }
+    match length - 2 {
         0 => match s {
             "if" => Some(&Tok::If),
             "in" => Some(&Tok::In),
@@ -215,6 +224,7 @@ pub fn get_token_match_len_dist(s: &str) -> Option<&Tok> {
             "else" => Some(&Tok::Else),
             "True" => Some(&Tok::True),
             "from" => Some(&Tok::From),
+            "elif" => Some(&Tok::Elif),
             "pass" => Some(&Tok::Pass),
             // Not represented in sample.
             "case" => Some(&Tok::Case),
@@ -252,5 +262,27 @@ pub fn get_token_match_len_dist(s: &str) -> Option<&Tok> {
             _ => None,
         },
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Test that these all agree on what is/isn't a keyword.
+    #[test]
+    fn test_conflict() {
+        let tokens: Vec<_> = include_str!("../stdlib_testlib.txt")
+            .split_whitespace()
+            .collect();
+
+        for token in tokens {
+            // phf taken from RustPython, assume correctness.
+            let res = get_token_phf(token);
+            assert!(res == get_token_stdlib_hash(token), "{:?}, {:?}", res, get_token_stdlib_hash(token));
+            assert!(res == get_token_match(token), "{:?}, {:?}", res, get_token_match(token));
+            assert!(res == get_token_match_len(token), "{:?}, {:?}", res, get_token_match_len(token));
+            assert!(res == get_token_match_len_dist(token), "{:?}, {:?}", res, get_token_match_len_dist(token));
+        }
     }
 }
