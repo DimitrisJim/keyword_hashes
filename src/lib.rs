@@ -14,11 +14,12 @@ pub fn get_token_phf(s: &str) -> Option<&Tok> {
 }
 
 // TODO: Fix up, add to benches.
-// static KEYWORDS_TINYPHF: tinyphf::Map<&'static str, Tok> = include!(concat!(env!("OUT_DIR"), "/keywords_tiny_phf.rs"));
-// #[inline(always)]
-// pub fn get_token_tinyphf(s: &str) -> Option<&Tok> {
-//     KEYWORDS_TINYPHF.get(s)
-// }
+static KEYWORDS_TINYPHF: tinyphf::Map<Tok> =
+    include!(concat!(env!("OUT_DIR"), "/keywords_tiny_phf.rs"));
+#[inline(always)]
+pub fn get_token_tinyphf(s: &str) -> Option<&Tok> {
+    KEYWORDS_TINYPHF.get(s)
+}
 
 static KEYWORDS_2: Lazy<HashMap<&'static str, Tok>> = Lazy::new(|| {
     let mut m = HashMap::new();
@@ -279,10 +280,36 @@ mod tests {
         for token in tokens {
             // phf taken from RustPython, assume correctness.
             let res = get_token_phf(token);
-            assert!(res == get_token_stdlib_hash(token), "{:?}, {:?}", res, get_token_stdlib_hash(token));
-            assert!(res == get_token_match(token), "{:?}, {:?}", res, get_token_match(token));
-            assert!(res == get_token_match_len(token), "{:?}, {:?}", res, get_token_match_len(token));
-            assert!(res == get_token_match_len_dist(token), "{:?}, {:?}", res, get_token_match_len_dist(token));
+            assert!(
+                res == get_token_stdlib_hash(token),
+                "{:?}, {:?}",
+                res,
+                get_token_stdlib_hash(token)
+            );
+            assert!(
+                res == get_token_match(token),
+                "{:?}, {:?}",
+                res,
+                get_token_match(token)
+            );
+            assert!(
+                res == get_token_match_len(token),
+                "{:?}, {:?}",
+                res,
+                get_token_match_len(token)
+            );
+            assert!(
+                res == get_token_match_len_dist(token),
+                "{:?}, {:?}",
+                res,
+                get_token_match_len_dist(token)
+            );
+            assert!(
+                res == get_token_tinyphf(token),
+                "{:?}, {:?}",
+                res,
+                get_token_tinyphf(token)
+            );
         }
     }
 }

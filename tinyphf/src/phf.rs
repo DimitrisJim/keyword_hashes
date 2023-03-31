@@ -2,9 +2,12 @@
 
 // todo: also return the seed from here.
 #[inline(always)]
-pub(crate) fn build_table(keys: Vec<String>, values: Vec<String>) -> (Vec<Option<(String, String)>>, u64) {
-    // 35 keywords, use a power of two for the table size.
-    let (attempts, mut table_size) = (50000000, 64);
+pub(crate) fn build_table(
+    keys: &[String],
+    values: &[String],
+) -> (Vec<Option<(String, String)>>, u64) {
+    // 35 keywords, use a power of two for the initial table size (which is ridiculously smol)
+    let (attempts, mut table_size) = (10000000, 64);
     // use a random seed to try and get a more uniform distribution.
     let mut seed = rand::random::<u64>();
     let mut collision = false;
@@ -17,7 +20,7 @@ pub(crate) fn build_table(keys: Vec<String>, values: Vec<String>) -> (Vec<Option
                 let hash = hash(key, seed);
                 let index = hash as usize % (table_size - 1);
                 if table[index].is_some() {
-                    // Collision, increase the table size and try again.
+                    // Collision, bump the seed and try again.
                     seed = rand::random::<u64>();
                     collision = true;
                     break;
@@ -27,19 +30,23 @@ pub(crate) fn build_table(keys: Vec<String>, values: Vec<String>) -> (Vec<Option
             if collision {
                 collision = false;
                 table_size *= 2;
-                continue;
+            } else {
+                // We successfully filled the table, return it.
+                return (table, seed);
             }
-            // We successfully filled the table, return it.
-            return (table, seed);
         }
     }
 }
 
-#[inline(always)]
 // Grab the first two bytes and the last byte of the string and just xor it with the seed.
-// We could try and do something more involved that might result in a more uniform distribution.
-// It's a tradeoff between build-speed + resulting size and hash speed. (I'm going for hash speed now).
-// todo: assumes minimum length of 2
+//
+// We could try and do something more involved that might result in a more uniform distribution but this
+// isn't an attempt to minimize table size, it's an attempt to minimize the ammount of work we do when
+// calculating a hash.
+//
+// I.e It's a tradeoff between build-speed + resulting size and hash speed.
+// Safety: We assume that the string is at least 2 bytes long.
+#[inline(always)]
 pub(crate) fn hash(s: &str, seed: u64) -> u64 {
     let bytes = s.as_bytes();
     let hash =
@@ -49,22 +56,40 @@ pub(crate) fn hash(s: &str, seed: u64) -> u64 {
 
 #[allow(unused)]
 pub mod map {
-    /// This is what we output from DisplayMap and what we eventually load into our
-    /// module.
-    pub struct Map<K: 'static, V: 'static> {
-        values: &'static [Option<(K, V)>],
-        seed: u64,
+    use std::borrow::Borrow;
+
+    use super::hash;
+
+    /// This is what we output from DisplayMap and what we
+    /// eventually load into our module.
+    pub struct Map<V: 'static> {
+        pub values: &'static [Option<(&'static str, V)>],
+        pub seed: u64,
     }
 
-    impl<K, V> Map<K, V> {
-        #[inline]
-        pub const fn new() -> Self {
-            Self { values: &[], seed: 0 }
-        }
-
-        pub fn get<T: ?Sized>(&self, _key: &T) -> Option<&V> {
+    impl<V> Map<V> {
+        // The only method that makes sense to support atm.
+        /// Grab the key, hash it, index ourselves and result the value.
+        pub fn get(&self, key: &str) -> Option<&V> {
+            // Early exit if the key is too long or too short.
+            if key.len() < 2 || key.len() > 8 {
+                return None;
+            }
+            let hash = hash(key, self.seed);
+            let index = hash as usize % (self.values.len() - 1);
             // Grab the hash and index values.
-            unimplemented!()
+            let entry = self.values[index].borrow();
+            if entry.is_some() {
+                let (k, v) = entry.as_ref().unwrap();
+                // check that we match:
+                if *k == key {
+                    Some(v)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         }
     }
 }
@@ -75,7 +100,6 @@ pub mod codegen {
 
     use std::collections::HashSet;
     use std::fmt;
-    use std::hash::Hash;
 
     // This is what we use in our build script; builds a DisplayMap which on
     // fmt will output the code for creating map::Map.
@@ -85,6 +109,7 @@ pub mod codegen {
     }
 
     impl Map {
+        /// Creates a new Map builder.
         pub fn new() -> Map {
             Map {
                 keys: vec![],
@@ -100,7 +125,7 @@ pub mod codegen {
         }
 
         /// Calculate the indexes and return a struct implementing
-        /// `fmt::Display` which will print the constructed `map::Map`.
+        /// the perfect (but unapologetically fat) hash map.
         ///
         /// Panics if there are any duplicate keys.
         pub fn build(&self) -> DisplayMap {
@@ -111,10 +136,12 @@ pub mod codegen {
                 }
             }
 
-            // TODO: Run the algorithm for finding the correct indexes for the
-            let (table, seed) = build_table(self.keys.clone(), self.values.clone());
+            let (table, seed) = build_table(&self.keys, &self.values);
             println!("{:?}", table.len());
-            DisplayMap { values: table, seed }
+            DisplayMap {
+                values: table,
+                seed,
+            }
         }
     }
 
@@ -127,14 +154,48 @@ pub mod codegen {
     impl fmt::Display for DisplayMap {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             // TODO: Write out the map properly
-            write!(f, "tinyphf::Map {{{0}, {1}}}", self.values.len(), self.seed)
+            write!(
+                f,
+                "tinyphf::Map {{
+    seed: {:?},
+    values: &[",
+                self.seed
+            )?;
+
+            // write map displacements
+            for tup in &self.values {
+                match tup {
+                    Some((d1, d2)) => {
+                        write!(
+                            f,
+                            "
+        Some((\"{}\", {})),",
+                            d1, d2
+                        )?;
+                    }
+                    None => {
+                        write!(
+                            f,
+                            "
+        None,"
+                        )?;
+                    }
+                }
+            }
+        write!(
+            f,
+            "
+    ],
+}}"
+        )
+            // write!(f, "tinyphf::Map {{{0}, {1}}}", self.values, self.seed)
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // Test that all keywords have a unique hash and that the hash doesn't panic
+    // Test that all keywords have a unique hash and that the hash doesn't panic.
     #[test]
     fn test_keywords() {
         use super::hash;

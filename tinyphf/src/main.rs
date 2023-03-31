@@ -1,6 +1,7 @@
 use tinyphf::codegen::Map;
 
 fn main() {
+    // Usually results in a "fat" (1024-2048 entries!) perfect hash map.
     let mut kwds = Map::new();
     let map = kwds
         // Alphabetical keywords:

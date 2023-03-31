@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use kwhash::{
     get_token_match, get_token_match_len, get_token_match_len_dist,
-    get_token_phf, get_token_stdlib_hash,
+    get_token_phf, get_token_stdlib_hash, get_token_tinyphf
 };
 
 macro_rules! bench_alt {
@@ -42,6 +42,7 @@ fn bench_alts(c: &mut Criterion) {
         "Match on keywords (pre match on length, most frequent matches first)",
         &tokens
     );
+    bench_alt!(c, get_token_tinyphf, "Tinyphf", &tokens);
 }
 
 criterion_group!(benches, bench_alts);

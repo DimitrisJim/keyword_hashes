@@ -7,7 +7,7 @@ fn main() {
     let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
     gen_phf(&out_dir);
     // TODO
-    // gen_alt_phf(&out_dir);
+    gen_alt_phf(&out_dir);
 }
 
 fn gen_phf(out_dir: &Path) {
