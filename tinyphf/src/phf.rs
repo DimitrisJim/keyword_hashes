@@ -1,6 +1,10 @@
 #![allow(clippy::new_without_default)]
 
-// todo: also return the seed from here.
+/// Builds the table by brute forcing the placement of the keys in the table until
+/// we find a table that doesn't have any collisions.
+///
+/// The table returns will almost always be chunky (i.e 1024-2048 entries) but will use a very
+/// simple hash function to calculate.
 #[inline(always)]
 pub(crate) fn build_table(
     keys: &[String],
@@ -8,12 +12,13 @@ pub(crate) fn build_table(
 ) -> (Vec<Option<(String, String)>>, u64) {
     // 35 keywords, use a power of two for the initial table size (which is ridiculously smol)
     let (attempts, mut table_size) = (10000000, 64);
-    // use a random seed to try and get a more uniform distribution.
     let mut seed = rand::random::<u64>();
     let mut collision = false;
+
+    // Todo: bail at some point, probably.
+    // Use the hash and try and fill up the table, if at any point we collide,
+    // increase the table size and try again.
     loop {
-        // Use the hash and try and fill up the table, if at any point we collide,
-        // increase the table size and try again.
         for _ in 0..attempts {
             let mut table = vec![None; table_size];
             for (key, value) in keys.iter().zip(values.iter()) {
@@ -38,14 +43,15 @@ pub(crate) fn build_table(
     }
 }
 
-// Grab the first two bytes and the last byte of the string and just xor it with the seed.
-//
-// We could try and do something more involved that might result in a more uniform distribution but this
-// isn't an attempt to minimize table size, it's an attempt to minimize the ammount of work we do when
-// calculating a hash.
-//
-// I.e It's a tradeoff between build-speed + resulting size and hash speed.
-// Safety: We assume that the string is at least 2 bytes long.
+/// Grabs the first two bytes and the last byte of the string and xors it with the seed.
+///
+/// We could try and do something more involved that might result in a more uniform distribution but this
+/// isn't an attempt to minimize table size, it's an attempt to minimize the ammount of work we do when
+/// calculating a hash.
+///
+/// I.e It's a tradeoff between build-speed + resulting size and hash speed.
+///
+/// Safety: We assume that the string is at least 2 bytes long, callers should ensure this.
 #[inline(always)]
 pub(crate) fn hash(s: &str, seed: u64) -> u64 {
     let bytes = s.as_bytes();
@@ -75,13 +81,13 @@ pub mod map {
             if key.len() < 2 || key.len() > 8 {
                 return None;
             }
+
+            // Get hash, find entry, compare key, decide.
             let hash = hash(key, self.seed);
             let index = hash as usize % (self.values.len() - 1);
-            // Grab the hash and index values.
             let entry = self.values[index].borrow();
             if entry.is_some() {
                 let (k, v) = entry.as_ref().unwrap();
-                // check that we match:
                 if *k == key {
                     Some(v)
                 } else {
@@ -135,13 +141,8 @@ pub mod codegen {
                     panic!("duplicate key `{}`", key);
                 }
             }
-
-            let (table, seed) = build_table(&self.keys, &self.values);
-            println!("{:?}", table.len());
-            DisplayMap {
-                values: table,
-                seed,
-            }
+            let (values, seed) = build_table(&self.keys, &self.values);
+            DisplayMap { values, seed }
         }
     }
 
@@ -153,7 +154,7 @@ pub mod codegen {
 
     impl fmt::Display for DisplayMap {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            // TODO: Write out the map properly
+            // Write an initialization of  map::Map.
             write!(
                 f,
                 "tinyphf::Map {{
@@ -162,7 +163,7 @@ pub mod codegen {
                 self.seed
             )?;
 
-            // write map displacements
+            // write map entries
             for tup in &self.values {
                 match tup {
                     Some((d1, d2)) => {
@@ -182,13 +183,12 @@ pub mod codegen {
                     }
                 }
             }
-        write!(
-            f,
-            "
+            write!(
+                f,
+                "
     ],
 }}"
-        )
-            // write!(f, "tinyphf::Map {{{0}, {1}}}", self.values, self.seed)
+            )
         }
     }
 }

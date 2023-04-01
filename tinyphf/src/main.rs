@@ -1,5 +1,6 @@
 use tinyphf::codegen::Map;
 
+// Main is mainly used for debugging purposes.
 fn main() {
     // Usually results in a "fat" (1024-2048 entries!) perfect hash map.
     let mut kwds = Map::new();
@@ -45,5 +46,6 @@ fn main() {
         .entry("with", "Tok::With")
         .entry("yield", "Tok::Yield")
         .build();
+    // Print the map, see what we got.
     println!("{}", map);
 }

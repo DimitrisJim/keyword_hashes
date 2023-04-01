@@ -119,7 +119,7 @@ pub fn get_token_match(s: &str) -> Option<&Tok> {
 #[inline(always)]
 pub fn get_token_match_len(s: &str) -> Option<&Tok> {
     let length = s.len();
-    if length < 2 || length > 8 {
+    if !(2..=8).contains(&length) {
         return None;
     }
     match length - 2 {
@@ -197,7 +197,7 @@ pub fn get_token_match_len(s: &str) -> Option<&Tok> {
 #[inline(always)]
 pub fn get_token_match_len_dist(s: &str) -> Option<&Tok> {
     let length = s.len();
-    if length < 2 || length > 8 {
+    if !(2..=8).contains(&length) {
         return None;
     }
     match length - 2 {
